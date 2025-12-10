@@ -1,0 +1,89 @@
+{
+  "files": [
+    {
+      "path": "fixtures/papers/2501.00001/metadata.json",
+      "sha256": "c58f643c14a0ae75942023a9303492c00299be66a78c3953806d9552ef9d0778",
+      "size": 236
+    },
+    {
+      "path": "fixtures/papers/2501.00001/tei.xml",
+      "sha256": "aa60fc47d93279471dd08c93656e189d4eb4ce5961bc3145f0a193bf4db17fc4",
+      "size": 427
+    },
+    {
+      "path": "fixtures/papers/arxiv_2501.00001.html",
+      "sha256": "3dbf5997c7cb5cf5524063ab146388dbaa5a07811a2124a4c91b04ee52af1724",
+      "size": 285
+    },
+    {
+      "path": "fixtures/web/api/articles/1.json",
+      "sha256": "517fb36cd68a5de1b2d0d7d93c7f5aded671ab00d95a0dfa9365cf3d6143a9f6",
+      "size": 177
+    },
+    {
+      "path": "fixtures/web/api/articles/2.json",
+      "sha256": "207e36bbb2d3ff9a824ff189c4cb9822dbf32098f603ffee40a3ebb1f2a78f03",
+      "size": 163
+    },
+    {
+      "path": "fixtures/web/api/paginated/page-1.json",
+      "sha256": "1b21793da159b7e990a977445e09768c954b0a507463f4928ea8a35fa54395fd",
+      "size": 108
+    },
+    {
+      "path": "fixtures/web/api/paginated/page-2.json",
+      "sha256": "6343cc2f31cdb7e856d73ab9ab3dff68bf7895f6577f6b611843d7f252979e14",
+      "size": 108
+    },
+    {
+      "path": "fixtures/web/api/paginated/page-3.json",
+      "sha256": "202e0fc04cf97bf547ca14d93caed0b0e622f642a88078dccf113b95cb663fbc",
+      "size": 71
+    },
+    {
+      "path": "fixtures/web/api/search.json",
+      "sha256": "6806dbb7b62570d6c919245acac2f6019e2eccc1edbd94106dc501ff89bcb17a",
+      "size": 217
+    },
+    {
+      "path": "fixtures/web/robots.txt",
+      "sha256": "f3339d00ceb2a2d1a3c38045daffbdd8ae8698080d19e0a5b6a38db69f6aa0fc",
+      "size": 50
+    },
+    {
+      "path": "fixtures/web/rss/feed.xml",
+      "sha256": "f2aa57a66e5e2c3d75287d2f584424e2b66629ccc3d0832a656cebde4be75f9f",
+      "size": 477
+    },
+    {
+      "path": "fixtures/web/site/article-1.html",
+      "sha256": "2cab5b71b71cc7874765e00f4e6126d336754167790e63c34c995e03593936e3",
+      "size": 425
+    },
+    {
+      "path": "fixtures/web/site/article-2.html",
+      "sha256": "f928a37075b923935b5455a47fba4e417412fac81f452c666e3975939ced1412",
+      "size": 431
+    },
+    {
+      "path": "fixtures/web/site/assets/style.css",
+      "sha256": "7abb6b9850ad7ae165c04342bd912acf2372bfe2be18ff94b42740ecbe2dea1e",
+      "size": 64
+    },
+    {
+      "path": "fixtures/web/site/index.html",
+      "sha256": "e212a4b5dcf04621f55c519ed24c54605dfbdde69ceac00ab0b6c3ddc1723fa6",
+      "size": 432
+    },
+    {
+      "path": "fixtures/web/site/malformed.html",
+      "sha256": "2b6082c83a077d137ff5035281f82b9af650a4d665c547b0145affaf7dc0da3c",
+      "size": 141
+    },
+    {
+      "path": "fixtures/web/sitemap.xml",
+      "sha256": "bb50bb04a512bb6cbf0508712de2fa18e58bde8ee872e9a396441fd44e89ed8f",
+      "size": 265
+    }
+  ]
+}

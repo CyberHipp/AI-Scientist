@@ -13,6 +13,9 @@ All notable changes to this project are documented in this file. Add entries und
 - Tests that validate mocked external dependency behavior and error reporting when APIs or credentials are missing.
 - Run-attempt logging for offline execution of a user-requested paper-generation task.
 - Repository workflow guidance that requires reading and updating `CHANGELOG.md` before opening pull requests.
+- Merge verification checklist documenting how to confirm whether local commits are merged or pending before starting new work.
+- Offline mock web fixture pack (HTML, JSON, RSS, paper-like pages) plus manifest, docs, and server utilities for deterministic tests without network calls, including edge cases (redirects, rate limits, compression, invalid JSON, timeouts, pagination, ETag/charset).
+- Nature-style Perspective documenting anthrobot implications, EvalOps specs, and combination-product regulatory intersections for living-construct evaluation.
 
 ### Changed
 - Template idea cache for `nanoGPT_lite` trimmed to reflect novel idea generation with mock dependencies.
