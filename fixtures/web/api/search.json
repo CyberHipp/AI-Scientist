@@ -1,0 +1,7 @@
+{
+  "query": "offline testing",
+  "results": [
+    {"id": 1, "title": "Understanding Offline Testing", "url": "/api/articles/1.json"},
+    {"id": 2, "title": "Testing Edge Cases", "url": "/api/articles/2.json"}
+  ]
+}
