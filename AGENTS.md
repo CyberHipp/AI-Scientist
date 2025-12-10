@@ -20,6 +20,7 @@ These instructions apply to the entire repository. Add more specific AGENTS.md f
 ## Workflow hygiene
 - Read `CHANGELOG.md` before starting work to understand recent changes and expectations.
 - Append a new entry to `CHANGELOG.md` that summarizes your changes before opening a pull request.
+- If you are unsure whether your branch is merged, follow `docs/merge_verification.md` to confirm status before proceeding.
 
 ## Security & safety
 - Do not hard-code secrets or enable outbound network calls in worker paths. Maintain sandbox-friendly patterns.

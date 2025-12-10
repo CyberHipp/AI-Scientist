@@ -21,6 +21,9 @@ class _FakeResponse:
 
 
 def test_search_for_papers_raises_http_error(monkeypatch):
+    monkeypatch.setattr(
+        "ai_scientist.generate_ideas.S2_API_KEY", "present-key", raising=False
+    )
     def fake_get(url, headers=None, params=None):
         return _FakeResponse(status_code=401, text="Unauthorized")
 
@@ -39,3 +42,12 @@ def test_get_response_from_llm_unsupported_model():
         get_response_from_llm("msg", fake_client, "unsupported-model", "sys")
 
     assert "not supported" in str(excinfo.value)
+
+
+def test_search_for_papers_without_api_key(monkeypatch):
+    monkeypatch.setattr("ai_scientist.generate_ideas.S2_API_KEY", None, raising=False)
+
+    with pytest.raises(ValueError) as excinfo:
+        search_for_papers("query", result_limit=1)
+
+    assert "S2_API_KEY" in str(excinfo.value)
