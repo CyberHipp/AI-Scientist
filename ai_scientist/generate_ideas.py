@@ -1,14 +1,69 @@
 import json
 import os
 import os.path as osp
+import sys
 import time
+import types
 from typing import List, Dict, Union
 from ai_scientist.llm import get_response_from_llm, extract_json_between_markers
 
-import requests
-import backoff
+MOCK_DEPENDENCIES = os.getenv("MOCK_DEPENDENCIES") == "1" or "--mock-dependencies" in sys.argv
+
+if MOCK_DEPENDENCIES:
+    def _identity_decorator(*args, **kwargs):  # pragma: no cover - compatibility shim
+        def wrapper(func):
+            return func
+
+        return wrapper
+
+    backoff = types.SimpleNamespace(on_exception=_identity_decorator, expo=lambda *args, **kwargs: None)
+
+    class _RequestsStub(types.SimpleNamespace):
+        def __init__(self):
+            super().__init__(exceptions=types.SimpleNamespace(HTTPError=Exception))
+
+        def get(self, *args, **kwargs):  # pragma: no cover - mock path bypasses network
+            return types.SimpleNamespace(status_code=200, json=lambda: {"total": 1, "data": _MOCK_PAPERS}, text="mocked", raise_for_status=lambda: None)
+
+    requests = _RequestsStub()
+else:
+    try:
+        import requests
+        import backoff
+    except ModuleNotFoundError:
+        def _identity_decorator(*args, **kwargs):  # pragma: no cover - fallback shim
+            def wrapper(func):
+                return func
+
+            return wrapper
+
+        backoff = types.SimpleNamespace(on_exception=_identity_decorator, expo=lambda *args, **kwargs: None)
+
+        class _RequestsStub(types.SimpleNamespace):
+            def __init__(self):
+                super().__init__(exceptions=types.SimpleNamespace(HTTPError=Exception))
+
+            def get(self, *args, **kwargs):  # pragma: no cover - offline path
+                return types.SimpleNamespace(
+                    status_code=200,
+                    json=lambda: {"total": 1, "data": _MOCK_PAPERS},
+                    text="offline",
+                    raise_for_status=lambda: None,
+                )
+
+        requests = _RequestsStub()
 
 S2_API_KEY = os.getenv("S2_API_KEY")
+_MOCK_PAPERS = [
+    {
+        "title": "Mocked Advances in Offline Research",
+        "authors": [{"name": "Test Author"}],
+        "venue": "OfflineConf",
+        "year": 2024,
+        "citationCount": 0,
+        "abstract": "A placeholder abstract for offline execution.",
+    }
+]
 
 idea_first_prompt = """{task_description}
 <experiment.py>
@@ -79,6 +134,7 @@ def generate_ideas(
     skip_generation=False,
     max_num_generations=20,
     num_reflections=5,
+    task_override=None,
 ):
     if skip_generation:
         # Load existing ideas from file
@@ -107,6 +163,7 @@ def generate_ideas(
         prompt = json.load(f)
 
     idea_system_prompt = prompt["system"]
+    task_description = task_override or prompt["task_description"]
 
     for _ in range(max_num_generations):
         print()
@@ -118,7 +175,7 @@ def generate_ideas(
             print(f"Iteration 1/{num_reflections}")
             text, msg_history = get_response_from_llm(
                 idea_first_prompt.format(
-                    task_description=prompt["task_description"],
+                    task_description=task_description,
                     code=code,
                     prev_ideas_string=prev_ideas_string,
                     num_reflections=num_reflections,
@@ -284,6 +341,12 @@ def on_backoff(details):
 def search_for_papers(query, result_limit=10) -> Union[None, List[Dict]]:
     if not query:
         return None
+    if MOCK_DEPENDENCIES:
+        return _MOCK_PAPERS[:result_limit]
+    if not S2_API_KEY:
+        raise ValueError(
+            "S2_API_KEY environment variable is required for Semantic Scholar access"
+        )
     rsp = requests.get(
         "https://api.semanticscholar.org/graph/v1/paper/search",
         headers={"X-API-KEY": S2_API_KEY},
@@ -363,12 +426,13 @@ def check_idea_novelty(
     client,
     model,
     max_num_iterations=10,
+    task_override=None,
 ):
     with open(osp.join(base_dir, "experiment.py"), "r") as f:
         code = f.read()
     with open(osp.join(base_dir, "prompt.json"), "r") as f:
         prompt = json.load(f)
-        task_description = prompt["task_description"]
+        task_description = task_override or prompt["task_description"]
 
     for idx, idea in enumerate(ideas):
         if "novel" in idea:
