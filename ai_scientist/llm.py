@@ -1,6 +1,39 @@
-import backoff
-import openai
 import json
+import os
+import sys
+import types
+
+MOCK_DEPENDENCIES = os.getenv("MOCK_DEPENDENCIES") == "1" or "--mock-dependencies" in sys.argv
+
+if MOCK_DEPENDENCIES:
+    def _identity_decorator(*args, **kwargs):  # pragma: no cover - compatibility shim
+        def wrapper(func):
+            return func
+
+        return wrapper
+
+    backoff = types.SimpleNamespace(on_exception=_identity_decorator, expo=lambda *args, **kwargs: None)
+
+    class _DummyCompletions:
+        def create(self, **kwargs):  # pragma: no cover - import-time shim
+            raise RuntimeError("Mock LLM completions should be provided by the mock model path")
+
+    class _DummyChat:
+        def __init__(self):
+            self.completions = _DummyCompletions()
+
+    class _DummyClient:
+        def __init__(self, *args, **kwargs):
+            self.chat = _DummyChat()
+
+    openai = types.SimpleNamespace(
+        OpenAI=_DummyClient,
+        RateLimitError=Exception,
+        APITimeoutError=Exception,
+    )
+else:
+    import backoff
+    import openai
 
 
 # Get N responses from a single message, used for ensembling.
@@ -18,7 +51,17 @@ def get_batch_responses_from_llm(
     if msg_history is None:
         msg_history = []
 
-    if model in [
+    if model == "mock-llm":
+        content = [_mock_llm_content(msg) for _ in range(n_responses)]
+        new_msg_history = [
+            msg_history
+            + [
+                {"role": "user", "content": msg},
+                {"role": "assistant", "content": c},
+            ]
+            for c in content
+        ]
+    elif model in [
         "gpt-4o-2024-05-13",
         "gpt-4o-mini-2024-07-18",
         "gpt-4o-2024-08-06",
@@ -118,7 +161,13 @@ def get_response_from_llm(
     if msg_history is None:
         msg_history = []
 
-    if model == "claude-3-5-sonnet-20240620":
+    if model == "mock-llm":
+        content = _mock_llm_content(msg)
+        new_msg_history = msg_history + [
+            {"role": "user", "content": msg},
+            {"role": "assistant", "content": content},
+        ]
+    elif model == "claude-3-5-sonnet-20240620":
         new_msg_history = msg_history + [
             {
                 "role": "user",
@@ -236,3 +285,20 @@ def extract_json_between_markers(llm_output):
         return parsed_json
     except json.JSONDecodeError:
         return None  # Invalid JSON format
+
+
+def _mock_llm_content(msg: str) -> str:
+    if "RESPONSE:" in msg and "Query" in msg:
+        return (
+            "THOUGHT: Conducted quick survey. Decision made: novel.\n"
+            "RESPONSE:\n````json\n{\"Query\": \"mock topic exploration\"}\n````"
+        ).replace("````", "```")
+
+    return (
+        "THOUGHT: Drafting a placeholder idea for offline testing. I am done.\n"
+        "NEW IDEA JSON:\n```json\n"
+        "{\"Name\": \"mock_idea\", \"Title\": \"Mock research idea\", "
+        "\"Experiment\": \"Run unit tests with fake data\", "
+        "\"Interestingness\": 5, \"Feasibility\": 10, \"Novelty\": 6}"
+        "\n```"
+    )
