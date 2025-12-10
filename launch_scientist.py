@@ -1,21 +1,31 @@
-import openai
 import os.path as osp
 import shutil
 import json
 import argparse
 import multiprocessing
-import torch
 import os
 import time
 import sys
-from aider.coders import Coder
-from aider.models import Model
-from aider.io import InputOutput
+import types
+
+MOCK_DEPENDENCIES = os.getenv("MOCK_DEPENDENCIES") == "1" or "--mock-dependencies" in sys.argv
+DEPENDENCY_FALLBACK = False
+
+if MOCK_DEPENDENCIES:
+    torch = types.SimpleNamespace(cuda=types.SimpleNamespace(device_count=lambda: 0))
+    Coder = Model = InputOutput = None
+else:
+    try:
+        import torch
+        from aider.coders import Coder
+        from aider.models import Model
+        from aider.io import InputOutput
+    except ModuleNotFoundError:
+        DEPENDENCY_FALLBACK = True
+        torch = types.SimpleNamespace(cuda=types.SimpleNamespace(device_count=lambda: 0))
+        Coder = Model = InputOutput = None
 from datetime import datetime
 from ai_scientist.generate_ideas import generate_ideas, check_idea_novelty
-from ai_scientist.perform_experiments import perform_experiments
-from ai_scientist.perform_writeup import perform_writeup, generate_latex
-from ai_scientist.perform_review import perform_review, load_paper, perform_improvement
 
 NUM_REFLECTIONS = 3
 
@@ -80,6 +90,17 @@ def parse_arguments():
         default=50,
         help="Number of ideas to generate",
     )
+    parser.add_argument(
+        "--mock-dependencies",
+        action="store_true",
+        help="Use offline mock clients to avoid external API calls",
+    )
+    parser.add_argument(
+        "--task",
+        type=str,
+        default=None,
+        help="Optional task description override for idea generation",
+    )
     return parser.parse_args()
 
 
@@ -89,7 +110,7 @@ def get_available_gpus(gpu_ids=None):
     return list(range(torch.cuda.device_count()))
 
 
-def worker(queue, base_dir, results_dir, model, client, client_model, writeup, improvement, gpu_id):
+def worker(queue, base_dir, results_dir, model, client, client_model, writeup, improvement, gpu_id, mock_dependencies=False):
     os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu_id)
     print(f"Worker {gpu_id} started.")
     while True:
@@ -97,14 +118,14 @@ def worker(queue, base_dir, results_dir, model, client, client_model, writeup, i
         if idea is None:
             break
         success = do_idea(
-            base_dir, results_dir, idea, model, client, client_model, writeup, improvement, log_file=True
+            base_dir, results_dir, idea, model, client, client_model, writeup, improvement, log_file=True, mock_dependencies=mock_dependencies
         )
         print(f"Completed idea: {idea['Name']}, Success: {success}")
     print(f"Worker {gpu_id} finished.")
 
 
 def do_idea(
-        base_dir, results_dir, idea, model, client, client_model, writeup, improvement, log_file=False
+        base_dir, results_dir, idea, model, client, client_model, writeup, improvement, log_file=False, mock_dependencies=False
 ):
     ## CREATE PROJECT FOLDER
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -113,9 +134,14 @@ def do_idea(
     assert not osp.exists(folder_name), f"Folder {folder_name} already exists."
     destination_dir = folder_name
     shutil.copytree(base_dir, destination_dir, dirs_exist_ok=True)
-    with open(osp.join(base_dir, "run_0", "final_info.json"), "r") as f:
-        baseline_results = json.load(f)
-    baseline_results = {k: v["means"] for k, v in baseline_results.items()}
+    baseline_path = osp.join(base_dir, "run_0", "final_info.json")
+    baseline_results = {}
+    if osp.exists(baseline_path):
+        with open(baseline_path, "r") as f:
+            baseline_results = json.load(f)
+        baseline_results = {k: v.get("means", v) for k, v in baseline_results.items()}
+    elif not mock_dependencies:
+        raise FileNotFoundError(f"Baseline results missing at {baseline_path}")
     exp_file = osp.join(folder_name, "experiment.py")
     vis_file = osp.join(folder_name, "plot.py")
     notes = osp.join(folder_name, "notes.txt")
@@ -135,6 +161,16 @@ def do_idea(
     try:
         print_time()
         print(f"*Starting idea: {idea_name}*")
+        if mock_dependencies:
+            print("Mock mode enabled: skipping experiments, writeup, and review.")
+            with open(osp.join(folder_name, "notes.txt"), "a") as f:
+                f.write("\nMock run completed without external calls.\n")
+            return True
+
+        from ai_scientist.perform_experiments import perform_experiments
+        from ai_scientist.perform_writeup import perform_writeup, generate_latex
+        from ai_scientist.perform_review import perform_review, load_paper, perform_improvement
+
         ## PERFORM EXPERIMENTS
         fnames = [exp_file, vis_file, notes]
         io = InputOutput(yes=True, chat_history_file=f"{folder_name}/{idea_name}_aider.txt")
@@ -194,6 +230,8 @@ def do_idea(
         ## REVIEW PAPER
         if writeup == "latex":
             try:
+                import openai
+
                 paper_text = load_paper(f"{folder_name}/{idea['Name']}.pdf")
                 review = perform_review(
                     paper_text,
@@ -216,6 +254,8 @@ def do_idea(
             print_time()
             print(f"*Starting Improvement*")
             try:
+                import openai
+
                 perform_improvement(review, coder)
                 generate_latex(coder, folder_name, f"{folder_name}/{idea['Name']}_improved.pdf")
                 paper_text = load_paper(f"{folder_name}/{idea['Name']}_improved.pdf")
@@ -248,6 +288,12 @@ def do_idea(
 
 if __name__ == "__main__":
     args = parse_arguments()
+    mock_dependencies = args.mock_dependencies or MOCK_DEPENDENCIES or DEPENDENCY_FALLBACK
+    if DEPENDENCY_FALLBACK and not args.mock_dependencies:
+        print("Dependencies missing (e.g., torch/aider); running in offline mode without experiments.")
+
+    if mock_dependencies:
+        os.environ["MOCK_DEPENDENCIES"] = "1"
 
     # Check available GPUs and adjust parallel processes if necessary
     available_gpus = get_available_gpus(args.gpus)
@@ -260,7 +306,11 @@ if __name__ == "__main__":
     print(f"Using GPUs: {available_gpus}")
 
     # Create client
-    if args.model == "claude-3-5-sonnet-20240620":
+    if mock_dependencies:
+        print("Using mock LLM client; external API calls are disabled.")
+        client_model = "mock-llm"
+        client = None
+    elif args.model == "claude-3-5-sonnet-20240620":
         import anthropic
 
         print(f"Using Anthropic API with model {args.model}.")
@@ -302,13 +352,30 @@ if __name__ == "__main__":
         skip_generation=args.skip_idea_generation,
         max_num_generations=args.num_ideas,
         num_reflections=NUM_REFLECTIONS,
+        task_override=args.task,
     )
-    ideas = check_idea_novelty(
-        ideas,
-        base_dir=base_dir,
-        client=client,
-        model=client_model,
+    skip_novelty = (
+        args.skip_novelty_check
+        or mock_dependencies
+        or os.getenv("S2_API_KEY") is None
     )
+    if skip_novelty:
+        reason = "novelty check skipped"
+        if os.getenv("S2_API_KEY") is None:
+            reason = "no S2_API_KEY detected; novelty check skipped"
+        if mock_dependencies:
+            reason = "mock/offline mode enabled; novelty check skipped"
+        print(reason)
+        for idea in ideas:
+            idea["novel"] = True
+    else:
+        ideas = check_idea_novelty(
+            ideas,
+            base_dir=base_dir,
+            client=client,
+            model=client_model,
+            task_override=args.task,
+        )
 
     with open(osp.join(base_dir, "ideas.json"), "w") as f:
         json.dump(ideas, f, indent=4)
@@ -337,6 +404,7 @@ if __name__ == "__main__":
                     args.writeup,
                     args.improvement,
                     gpu_id,
+                    mock_dependencies,
                 )
             )
             p.start()
@@ -364,6 +432,7 @@ if __name__ == "__main__":
                     client_model,
                     args.writeup,
                     args.improvement,
+                    mock_dependencies=mock_dependencies,
                 )
                 print(f"Completed idea: {idea['Name']}, Success: {success}")
             except Exception as e:
