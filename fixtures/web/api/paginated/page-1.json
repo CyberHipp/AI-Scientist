@@ -1,0 +1,7 @@
+{
+  "page": 1,
+  "results": [
+    {"id": "p1", "title": "First"},
+    {"id": "p2", "title": "Second"}
+  ]
+}

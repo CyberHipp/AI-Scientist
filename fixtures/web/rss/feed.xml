@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Mock Feed</title>
+    <link>http://localhost/site/index.html</link>
+    <description>Offline RSS feed for tests</description>
+    <item>
+      <title>Understanding Offline Testing</title>
+      <link>http://localhost/site/article-1.html</link>
+    </item>
+    <item>
+      <title>Testing Edge Cases</title>
+      <link>http://localhost/site/article-2.html</link>
+    </item>
+  </channel>
+</rss>
