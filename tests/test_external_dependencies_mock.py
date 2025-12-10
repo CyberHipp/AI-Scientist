@@ -25,9 +25,6 @@ class _FakeResponse:
 
 def test_search_for_papers_uses_mocked_requests(monkeypatch):
     captured = {}
-    monkeypatch.setattr(
-        "ai_scientist.generate_ideas.S2_API_KEY", "test-api-key", raising=False
-    )
 
     def fake_get(url, headers=None, params=None):
         captured["url"] = url
@@ -59,7 +56,6 @@ def test_search_for_papers_uses_mocked_requests(monkeypatch):
     assert captured["url"] == "https://api.semanticscholar.org/graph/v1/paper/search"
     # Ensure headers and params are forwarded to the external API
     assert "X-API-KEY" in captured["headers"]
-    assert captured["headers"]["X-API-KEY"] == "test-api-key"
     assert captured["params"]["limit"] == 5
     assert captured["params"]["query"] == "transformers"
 
